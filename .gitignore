@@ -21,4 +21,10 @@ Resources/models/
 # Logs
 *.log
 docs
+!docs/
+docs/*
+!docs/superpowers/
+docs/superpowers/*
+!docs/superpowers/specs/
+!docs/superpowers/specs/**
 .superpowers/
