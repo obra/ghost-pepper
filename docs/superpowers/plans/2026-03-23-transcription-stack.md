@@ -386,6 +386,20 @@ git commit -m "feat: add foundation models cleanup backend"
 
 ## Chunk 4: `codex/ocr-context`
 
+Reference implementation notes:
+
+- Use the local ignored reference checkout at `inspo/winby` during implementation.
+- Start with:
+  - `inspo/winby/Sources/Winby/AppConfig.swift`
+  - `inspo/winby/Sources/Winby/WindowManager+Screenshots.swift`
+  - `inspo/winby/Sources/Winby/WindowManager+ContentSearch.swift`
+  - `inspo/winby/docs/screenshot-capture.md`
+- Relevant APIs already exercised there:
+  - `CGPreflightScreenCaptureAccess()`
+  - Screen Recording settings URL
+  - `SCShareableContent`, `SCContentFilter`, `SCScreenshotManager.captureImage`
+  - `VNRecognizeTextRequest` in accurate mode
+
 ### Task 8: Add permission-aware window capture and OCR services
 
 **Files:**

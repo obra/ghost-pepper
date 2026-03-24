@@ -30,3 +30,4 @@ docs/superpowers/*
 !docs/superpowers/plans/
 !docs/superpowers/plans/**
 .superpowers/
+inspo/
