@@ -15,7 +15,7 @@ class MicLevelMonitor: ObservableObject {
     func start() {
         guard !isRunning else { return }
         // Only start if mic permission is already granted
-        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { return }
+        guard PermissionChecker.microphoneStatus() == .authorized else { return }
         let engine = AVAudioEngine()
         let inputNode = engine.inputNode
         let format = inputNode.outputFormat(forBus: 0)
@@ -382,8 +382,9 @@ struct SetupStep: View {
             }
         }
         .onAppear {
-            micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-            micDenied = AVCaptureDevice.authorizationStatus(for: .audio) == .denied
+            let microphoneStatus = PermissionChecker.microphoneStatus()
+            micGranted = microphoneStatus == .authorized
+            micDenied = microphoneStatus == .denied
             accessibilityGranted = PermissionChecker.checkAccessibility()
 
             if micGranted {

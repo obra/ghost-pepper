@@ -1,39 +1,105 @@
 import Cocoa
 import AVFoundation
 
+enum MicrophonePermissionStatus: Equatable {
+    case authorized
+    case denied
+    case notDetermined
+}
+
 class PermissionChecker {
+    struct Client {
+        let checkAccessibility: () -> Bool
+        let promptAccessibility: () -> Void
+        let microphoneStatus: () -> MicrophonePermissionStatus
+        let requestMicrophoneAccess: () async -> Bool
+        let openAccessibilitySettings: () -> Void
+        let openMicrophoneSettings: () -> Void
+    }
+
+    static let defaultClient: Client = {
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return Client.test
+        }
+        return Client.live
+    }()
+
+    static var current = defaultClient
 
     static func checkAccessibility() -> Bool {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): false] as CFDictionary
-        return AXIsProcessTrustedWithOptions(options)
+        current.checkAccessibility()
     }
 
     static func promptAccessibility() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
-        AXIsProcessTrustedWithOptions(options)
+        current.promptAccessibility()
+    }
+
+    static func microphoneStatus() -> MicrophonePermissionStatus {
+        current.microphoneStatus()
     }
 
     static func checkMicrophone() async -> Bool {
-        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        let status = microphoneStatus()
         switch status {
         case .authorized:
             return true
         case .notDetermined:
-            return await AVCaptureDevice.requestAccess(for: .audio)
-        default:
+            return await current.requestMicrophoneAccess()
+        case .denied:
             return false
         }
     }
 
     static func openAccessibilitySettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
-        }
+        current.openAccessibilitySettings()
     }
 
     static func openMicrophoneSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
-            NSWorkspace.shared.open(url)
-        }
+        current.openMicrophoneSettings()
     }
+}
+
+private extension PermissionChecker.Client {
+    static let live = PermissionChecker.Client(
+        checkAccessibility: {
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): false] as CFDictionary
+            return AXIsProcessTrustedWithOptions(options)
+        },
+        promptAccessibility: {
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
+            AXIsProcessTrustedWithOptions(options)
+        },
+        microphoneStatus: {
+            switch AVCaptureDevice.authorizationStatus(for: .audio) {
+            case .authorized:
+                return .authorized
+            case .notDetermined:
+                return .notDetermined
+            default:
+                return .denied
+            }
+        },
+        requestMicrophoneAccess: {
+            await AVCaptureDevice.requestAccess(for: .audio)
+        },
+        openAccessibilitySettings: {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                NSWorkspace.shared.open(url)
+            }
+        },
+        openMicrophoneSettings: {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+                NSWorkspace.shared.open(url)
+            }
+        }
+    )
+
+    static let test = PermissionChecker.Client(
+        checkAccessibility: { false },
+        promptAccessibility: {},
+        microphoneStatus: { .denied },
+        requestMicrophoneAccess: { false },
+        openAccessibilitySettings: {},
+        openMicrophoneSettings: {}
+    )
 }
