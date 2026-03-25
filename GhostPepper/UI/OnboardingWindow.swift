@@ -207,7 +207,7 @@ struct SetupStep: View {
 
     private var modelRows: [RuntimeModelRow] {
         RuntimeModelInventory.rows(
-            selectedSpeechModelName: appState.whisperModel,
+            selectedSpeechModelName: appState.speechModel,
             activeSpeechModelName: modelManager.modelName,
             speechModelState: modelManager.state,
             cachedSpeechModelNames: modelManager.cachedModelNames,
@@ -355,7 +355,7 @@ struct SetupStep: View {
                         title: "AI Models",
                         subtitle: modelManager.state == .error
                             ? "Download failed"
-                            : RuntimeModelInventory.activeDownloadText(rows: modelRows) ?? (modelManager.isReady ? "Ready" : "Waiting to download speech model"),
+                            : RuntimeModelInventory.activeDownloadText(rows: modelRows) ?? (modelManager.isReady ? "Ready" : "Waiting to download model"),
                         isComplete: modelManager.isReady
                     ) {
                         if modelManager.state == .loading {
@@ -510,11 +510,11 @@ class TryItController: ObservableObject {
     private var hasAdvanced = false
     private var retryCount = 0
     private let maxRetries = 5
-    private let transcriber: WhisperTranscriber
+    private let transcriber: SpeechTranscriber
     private let hotkeyMonitorFactory: ([ChordAction: KeyChord]) -> HotkeyMonitoring
 
     init(
-        transcriber: WhisperTranscriber,
+        transcriber: SpeechTranscriber,
         hotkeyMonitorFactory: @escaping ([ChordAction: KeyChord]) -> HotkeyMonitoring = { bindings in
             HotkeyMonitor(bindings: bindings)
         }

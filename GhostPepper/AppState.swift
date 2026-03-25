@@ -37,7 +37,7 @@ class AppState: ObservableObject {
     }
     @AppStorage("cleanupEnabled") var cleanupEnabled: Bool = true
     @AppStorage("cleanupPrompt") var cleanupPrompt: String = TextCleaner.defaultPrompt
-    @AppStorage("whisperModel") var whisperModel: String = "openai_whisper-small.en"
+    @AppStorage("speechModel") var speechModel: String = SpeechModelCatalog.defaultModelID
     @Published private(set) var pushToTalkChord: KeyChord
     @Published private(set) var toggleToTalkChord: KeyChord
     @Published var postPasteLearningEnabled: Bool {
@@ -52,7 +52,7 @@ class AppState: ObservableObject {
 
     let modelManager = ModelManager()
     let audioRecorder = AudioRecorder()
-    let transcriber: WhisperTranscriber
+    let transcriber: SpeechTranscriber
     let textPaster: TextPaster
     let soundEffects = SoundEffects()
     let hotkeyMonitor: HotkeyMonitoring
@@ -151,7 +151,7 @@ class AppState: ObservableObject {
         self.cleanupBackend = storedCleanupBackend
         self.frontmostWindowContextEnabled = storedFrontmostWindowContextEnabled
         self.postPasteLearningEnabled = storedPostPasteLearningEnabled
-        self.transcriber = WhisperTranscriber(modelManager: modelManager)
+        self.transcriber = SpeechTranscriber(modelManager: modelManager)
         self.textCleaner = TextCleaner(
             cleanupManager: self.textCleanupManager,
             correctionStore: self.correctionStore
@@ -240,14 +240,14 @@ class AppState: ObservableObject {
         }
         debugLogStore.record(category: .model, message: "App initialization started.")
         if !modelManager.isReady {
-            await modelManager.loadModel(name: whisperModel)
+            await modelManager.loadModel(name: speechModel)
         }
         if showOverlay {
             overlay.dismiss()
         }
 
         guard modelManager.isReady else {
-            errorMessage = "Failed to load whisper model: \(modelManager.error?.localizedDescription ?? "unknown error")"
+            errorMessage = "Failed to load speech model: \(modelManager.error?.localizedDescription ?? "unknown error")"
             status = .error
             return
         }
@@ -321,7 +321,7 @@ class AppState: ObservableObject {
     }
 
     private func startRecording() {
-        // If whisper model isn't ready, show loading message
+        // If the selected speech model isn't ready, show loading message
         guard status == .ready else {
             if status == .loading {
                 overlay.show(message: .modelLoading)

@@ -2,7 +2,25 @@ import XCTest
 @testable import GhostPepper
 
 @MainActor
-final class WhisperTranscriberTests: XCTestCase {
+final class SpeechTranscriberTests: XCTestCase {
+
+    func testSpeechModelCatalogIncludesWhisperAndParakeetModels() {
+        XCTAssertEqual(SpeechModelCatalog.availableModels.map(\.id), [
+            "openai_whisper-tiny.en",
+            "openai_whisper-small.en",
+            "openai_whisper-small",
+            "fluid_parakeet-v3",
+        ])
+
+        XCTAssertEqual(SpeechModelCatalog.availableModels.map(\.backend), [
+            .whisperKit,
+            .whisperKit,
+            .whisperKit,
+            .fluidAudio,
+        ])
+
+        XCTAssertEqual(SpeechModelCatalog.defaultModelID, "openai_whisper-small.en")
+    }
 
     // MARK: - ModelManager Tests
 
@@ -38,24 +56,24 @@ final class WhisperTranscriberTests: XCTestCase {
         }
     }
 
-    // MARK: - WhisperTranscriber Tests
+    // MARK: - SpeechTranscriber Tests
 
     func testTranscriberReportsNotReadyBeforeModelLoad() {
         let manager = ModelManager()
-        let transcriber = WhisperTranscriber(modelManager: manager)
+        let transcriber = SpeechTranscriber(modelManager: manager)
         XCTAssertFalse(transcriber.isReady)
     }
 
     func testTranscriberEmptyAudioReturnsNil() async {
         let manager = ModelManager()
-        let transcriber = WhisperTranscriber(modelManager: manager)
+        let transcriber = SpeechTranscriber(modelManager: manager)
         let result = await transcriber.transcribe(audioBuffer: [])
         XCTAssertNil(result, "Empty audio buffer should return nil")
     }
 
     func testTranscriberReturnsNilWhenModelNotLoaded() async {
         let manager = ModelManager()
-        let transcriber = WhisperTranscriber(modelManager: manager)
+        let transcriber = SpeechTranscriber(modelManager: manager)
         // Non-empty buffer but model not loaded should return nil
         let silence = [Float](repeating: 0.0, count: 16000)
         let result = await transcriber.transcribe(audioBuffer: silence)

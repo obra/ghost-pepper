@@ -1,95 +1,52 @@
 import Foundation
+import FluidAudio
 import WhisperKit
 
-struct SpeechModelDescriptor: Identifiable, Equatable {
-    let name: String
-    let pickerTitle: String
-    let variantName: String
-    let sizeDescription: String
-    let cachePathComponents: [String]
-
-    var id: String { name }
-
-    var pickerLabel: String {
-        "\(pickerTitle) (\(variantName) — \(sizeDescription))"
-    }
-
-    var statusName: String {
-        "Whisper \(variantName) (\(pickerTitle.lowercased()))"
-    }
-}
-
-/// Manages WhisperKit model lifecycle: download, load, and readiness state.
+/// Manages local speech model lifecycle: download, load, and readiness state.
 @MainActor
 final class ModelManager: ObservableObject {
-    /// The underlying WhisperKit instance, nil until successfully loaded.
     private(set) var whisperKit: WhisperKit?
+    private var fluidAudioManager: AsrManager?
 
-    /// Current state of the model.
     @Published private(set) var state: ModelManagerState = .idle
-
-    /// The model variant to use for transcription.
     private(set) var modelName: String
-
-    /// Any error encountered during model setup.
     @Published private(set) var error: Error?
 
     var debugLogger: ((DebugLogCategory, String) -> Void)?
 
-    /// Whether the model is loaded and ready for transcription.
     var isReady: Bool {
         state == .ready
     }
 
-    static let availableModels = [
-        SpeechModelDescriptor(
-            name: "openai_whisper-tiny.en",
-            pickerTitle: "Speed",
-            variantName: "tiny.en",
-            sizeDescription: "~75 MB",
-            cachePathComponents: ["openai", "whisper-tiny.en"]
-        ),
-        SpeechModelDescriptor(
-            name: "openai_whisper-small.en",
-            pickerTitle: "Accuracy",
-            variantName: "small.en",
-            sizeDescription: "~466 MB",
-            cachePathComponents: ["openai", "whisper-small.en"]
-        ),
-        SpeechModelDescriptor(
-            name: "openai_whisper-small",
-            pickerTitle: "Multilingual",
-            variantName: "small",
-            sizeDescription: "~466 MB",
-            cachePathComponents: ["openai", "whisper-small"]
-        ),
-    ]
+    static let availableModels = SpeechModelCatalog.availableModels
 
     var cachedModelNames: Set<String> {
         Self.availableModels.reduce(into: Set<String>()) { names, model in
-            let modelPath = model.cachePathComponents.reduce(Self.modelsRootDirectory) { partialURL, component in
-                partialURL.appendingPathComponent(component, isDirectory: true)
-            }
-            if FileManager.default.fileExists(atPath: modelPath.path) {
+            if Self.modelIsCached(model) {
                 names.insert(model.name)
             }
         }
     }
 
-    init(modelName: String = "openai_whisper-small.en") {
+    init(modelName: String = SpeechModelCatalog.defaultModelID) {
         self.modelName = modelName
     }
 
-    /// Loads the WhisperKit model. Downloads from Hugging Face if not cached.
-    /// Pass a different name to switch models.
     func loadModel(name: String? = nil) async {
         let requestedName = name ?? modelName
+        guard let requestedModel = SpeechModelCatalog.model(named: requestedName) else {
+            let missingModelError = NSError(
+                domain: "GhostPepper.ModelManager",
+                code: 404,
+                userInfo: [NSLocalizedDescriptionKey: "Unknown speech model \(requestedName)"]
+            )
+            error = missingModelError
+            state = .error
+            return
+        }
 
-        // If switching models, reset first
         if requestedName != modelName && state == .ready {
-            whisperKit = nil
-            state = .idle
-            modelName = requestedName
+            resetLoadedModels()
         } else if state == .ready {
             return
         }
@@ -99,39 +56,119 @@ final class ModelManager: ObservableObject {
 
         state = .loading
         error = nil
-        debugLogger?(.model, "Loading Whisper model \(modelName).")
+        debugLogger?(.model, "Loading speech model \(modelName).")
 
         do {
-            let modelsDir = Self.modelsDirectory
-            try? FileManager.default.createDirectory(at: modelsDir, withIntermediateDirectories: true)
-
-            let config = WhisperKitConfig(
-                model: modelName,
-                downloadBase: modelsDir,
-                verbose: false,
-                logLevel: .error,
-                prewarm: false,
-                load: true,
-                download: true
-            )
-            let kit = try await WhisperKit(config)
-            self.whisperKit = kit
+            switch requestedModel.backend {
+            case .whisperKit:
+                try await loadWhisperModel(named: requestedModel.name)
+            case .fluidAudio:
+                try await loadFluidAudioModel(requestedModel)
+            }
             self.state = .ready
-            debugLogger?(.model, "Whisper model \(modelName) loaded successfully.")
+            debugLogger?(.model, "Speech model \(modelName) loaded successfully.")
         } catch {
             self.error = error
             self.state = .error
-            debugLogger?(.model, "Whisper model \(modelName) failed to load: \(error.localizedDescription)")
+            debugLogger?(.model, "Speech model \(modelName) failed to load: \(error.localizedDescription)")
         }
     }
 
-    private static var modelsDirectory: URL {
+    func transcribe(audioBuffer: [Float]) async -> String? {
+        guard !audioBuffer.isEmpty else { return nil }
+        guard let model = SpeechModelCatalog.model(named: modelName) else { return nil }
+
+        do {
+            switch model.backend {
+            case .whisperKit:
+                guard let whisperKit else { return nil }
+                let results: [TranscriptionResult] = try await whisperKit.transcribe(audioArray: audioBuffer)
+                let text = results
+                    .map(\.text)
+                    .joined(separator: " ")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let cleaned = SpeechTranscriber.removeArtifacts(from: text)
+                return cleaned.isEmpty ? nil : cleaned
+            case .fluidAudio:
+                guard let fluidAudioManager else { return nil }
+                let result = try await fluidAudioManager.transcribe(audioBuffer, source: .microphone)
+                let cleaned = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                return cleaned.isEmpty ? nil : cleaned
+            }
+        } catch {
+            debugLogger?(.model, "Speech transcription failed for \(modelName): \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private func loadWhisperModel(named modelName: String) async throws {
+        let modelsDir = Self.whisperModelsDirectory
+        try? FileManager.default.createDirectory(at: modelsDir, withIntermediateDirectories: true)
+
+        let config = WhisperKitConfig(
+            model: modelName,
+            downloadBase: modelsDir,
+            verbose: false,
+            logLevel: .error,
+            prewarm: false,
+            load: true,
+            download: true
+        )
+        whisperKit = try await WhisperKit(config)
+    }
+
+    private func loadFluidAudioModel(_ model: SpeechModelDescriptor) async throws {
+        guard let fluidAudioVariant = model.fluidAudioVariant else {
+            throw NSError(
+                domain: "GhostPepper.ModelManager",
+                code: 500,
+                userInfo: [NSLocalizedDescriptionKey: "Missing FluidAudio variant for \(model.name)"]
+            )
+        }
+
+        let version: AsrModelVersion
+        switch fluidAudioVariant {
+        case .parakeetV3:
+            version = .v3
+        }
+
+        let models = try await AsrModels.downloadAndLoad(version: version)
+        let manager = AsrManager(config: .default)
+        try await manager.initialize(models: models)
+        fluidAudioManager = manager
+    }
+
+    private func resetLoadedModels() {
+        whisperKit = nil
+        fluidAudioManager = nil
+        state = .idle
+    }
+
+    private static func modelIsCached(_ model: SpeechModelDescriptor) -> Bool {
+        switch model.backend {
+        case .whisperKit:
+            let modelPath = model.cachePathComponents.reduce(whisperModelsRootDirectory) { partialURL, component in
+                partialURL.appendingPathComponent(component, isDirectory: true)
+            }
+            return FileManager.default.fileExists(atPath: modelPath.path)
+        case .fluidAudio:
+            guard let fluidAudioVariant = model.fluidAudioVariant else {
+                return false
+            }
+            switch fluidAudioVariant {
+            case .parakeetV3:
+                return AsrModels.modelsExist(at: AsrModels.defaultCacheDirectory(for: .v3), version: .v3)
+            }
+        }
+    }
+
+    private static var whisperModelsDirectory: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return appSupport.appendingPathComponent("GhostPepper/whisper-models", isDirectory: true)
     }
 
-    private static var modelsRootDirectory: URL {
-        modelsDirectory.appendingPathComponent("models", isDirectory: true)
+    private static var whisperModelsRootDirectory: URL {
+        whisperModelsDirectory.appendingPathComponent("models", isDirectory: true)
     }
 }
 

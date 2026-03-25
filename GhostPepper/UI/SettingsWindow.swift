@@ -144,7 +144,7 @@ struct SettingsView: View {
 
     private var modelRows: [RuntimeModelRow] {
         RuntimeModelInventory.rows(
-            selectedSpeechModelName: appState.whisperModel,
+            selectedSpeechModelName: appState.speechModel,
             activeSpeechModelName: appState.modelManager.modelName,
             speechModelState: appState.modelManager.state,
             cachedSpeechModelNames: appState.modelManager.cachedModelNames,
@@ -239,12 +239,12 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Picker("Speech Model", selection: $appState.whisperModel) {
+                Picker("Speech Model", selection: $appState.speechModel) {
                     ForEach(ModelManager.availableModels) { model in
                         Text(model.pickerLabel).tag(model.name)
                     }
                 }
-                .onChange(of: appState.whisperModel) { _, newModel in
+                .onChange(of: appState.speechModel) { _, newModel in
                     Task {
                         await appState.modelManager.loadModel(name: newModel)
                     }
@@ -426,7 +426,7 @@ struct SettingsView: View {
     }
 
     private func downloadMissingModels() async {
-        let selectedSpeechModelName = appState.whisperModel
+        let selectedSpeechModelName = appState.speechModel
         let missingSpeechModels = ModelManager.availableModels
             .map(\.name)
             .filter { !appState.modelManager.cachedModelNames.contains($0) }

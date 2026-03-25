@@ -9,6 +9,9 @@ packages:
   WhisperKit:
     url: https://github.com/argmaxinc/WhisperKit.git
     from: "0.16.0"
+  FluidAudio:
+    url: https://github.com/FluidInference/FluidAudio.git
+    from: "0.12.4"
   LLM.swift:
     url: https://github.com/obra/LLM.swift.git
     branch: main
@@ -36,6 +39,7 @@ targets:
         DEVELOPMENT_TEAM: BBVMGXR9AY
     dependencies:
       - package: WhisperKit
+      - package: FluidAudio
       - package: LLM.swift
         product: LLM
       - package: Sparkle

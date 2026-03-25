@@ -17,6 +17,7 @@ final class RuntimeModelInventoryTests: XCTestCase {
             "Whisper tiny.en (speed)",
             "Whisper small.en (accuracy)",
             "Whisper small (multilingual)",
+            "Parakeet v3 (25 languages)",
             TextCleanupManager.fastModel.displayName,
             TextCleanupManager.fullModel.displayName,
         ])
@@ -30,11 +31,14 @@ final class RuntimeModelInventoryTests: XCTestCase {
         XCTAssertEqual(rows[2].status, .notLoaded)
         XCTAssertFalse(rows[2].isSelected)
 
-        XCTAssertEqual(rows[3].status, .loaded)
+        XCTAssertEqual(rows[3].status, .notLoaded)
         XCTAssertFalse(rows[3].isSelected)
 
-        XCTAssertEqual(rows[4].status, .downloading(progress: 0.4))
+        XCTAssertEqual(rows[4].status, .loaded)
         XCTAssertFalse(rows[4].isSelected)
+
+        XCTAssertEqual(rows[5].status, .downloading(progress: 0.4))
+        XCTAssertFalse(rows[5].isSelected)
     }
 
     func testRuntimeModelRowsSeparateSelectedSpeechModelFromActiveDownload() {
