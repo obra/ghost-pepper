@@ -9,4 +9,21 @@ final class GhostPepperTests: XCTestCase {
         XCTAssertEqual(AppStatus.transcribing.rawValue, "Transcribing...")
         XCTAssertEqual(AppStatus.error.rawValue, "Error")
     }
+
+    func testCleanupTemplateUsesQwenThinkingFormat() {
+        let prompt = "You are helpful."
+        let output = TextCleaner.cleanupTemplate(prompt: prompt).preprocess("Hello", [], .suppressed)
+        let expected = """
+        <|im_start|>system
+        \(prompt)<|im_end|>
+        <|im_start|>user
+        Hello<|im_end|>
+        <|im_start|>assistant
+        <think>
+
+        </think>
+
+        """ + "\n"
+        XCTAssertEqual(output, expected)
+    }
 }

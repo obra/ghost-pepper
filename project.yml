@@ -10,8 +10,8 @@ packages:
     url: https://github.com/argmaxinc/WhisperKit.git
     from: "0.16.0"
   LLM.swift:
-    url: https://github.com/eastriverlee/LLM.swift.git
-    branch: main
+    url: https://github.com/obra/LLM.swift.git
+    branch: codex/qwen35-support
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle.git
     from: "2.6.0"

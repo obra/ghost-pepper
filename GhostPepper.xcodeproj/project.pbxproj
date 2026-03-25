@@ -612,9 +612,9 @@
 /* Begin XCRemoteSwiftPackageReference section */
 		54CA35E39798034214C6179F /* XCRemoteSwiftPackageReference "LLM.swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/eastriverlee/LLM.swift.git";
+			repositoryURL = "https://github.com/obra/LLM.swift.git";
 			requirement = {
-				branch = main;
+				branch = "codex/qwen35-support";
 				kind = branch;
 			};
 		};
