@@ -95,7 +95,9 @@ final class TextCleanupManager: ObservableObject {
 
         // Load fast model first (smaller, quicker to load)
         let fast = await Task.detached { () -> LLM? in
-            return LLM(from: fastPath, template: TextCleaner.cleanupTemplate(prompt: TextCleaner.defaultPrompt), maxTokenCount: 2048)
+            guard let llm = LLM(from: fastPath, maxTokenCount: 2048) else { return nil }
+            llm.useResolvedTemplate(systemPrompt: TextCleaner.defaultPrompt)
+            return llm
         }.value
 
         if let fast = fast {
@@ -107,7 +109,9 @@ final class TextCleanupManager: ObservableObject {
 
         // Load full model
         let full = await Task.detached { () -> LLM? in
-            return LLM(from: fullPath, template: TextCleaner.cleanupTemplate(prompt: TextCleaner.defaultPrompt), maxTokenCount: 4096)
+            guard let llm = LLM(from: fullPath, maxTokenCount: 4096) else { return nil }
+            llm.useResolvedTemplate(systemPrompt: TextCleaner.defaultPrompt)
+            return llm
         }.value
 
         guard let full = full else {

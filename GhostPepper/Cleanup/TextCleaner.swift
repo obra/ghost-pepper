@@ -32,10 +32,6 @@ final class TextCleaner {
 
     private static let timeoutSeconds: TimeInterval = 15.0
 
-    static func cleanupTemplate(prompt: String) -> Template {
-        Template.qwen(prompt)
-    }
-
     init(cleanupManager: TextCleanupManager) {
         self.cleanupManager = cleanupManager
     }
@@ -57,7 +53,7 @@ final class TextCleaner {
 
         // Update template with current prompt
         let activePrompt = prompt ?? Self.defaultPrompt
-        llm.template = Self.cleanupTemplate(prompt: activePrompt)
+        llm.useResolvedTemplate(systemPrompt: activePrompt)
         llm.history = []
 
         let start = Date()

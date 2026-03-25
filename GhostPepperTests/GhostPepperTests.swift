@@ -1,4 +1,5 @@
 import XCTest
+import LLM
 @testable import GhostPepper
 
 final class GhostPepperTests: XCTestCase {
@@ -12,7 +13,8 @@ final class GhostPepperTests: XCTestCase {
 
     func testCleanupTemplateUsesQwenThinkingFormat() {
         let prompt = "You are helpful."
-        let output = TextCleaner.cleanupTemplate(prompt: prompt).preprocess("Hello", [], .suppressed)
+        let template = HuggingFaceModel("unsloth/Qwen3.5-4B-GGUF").resolveTemplate(systemPrompt: prompt)
+        let output = template.preprocess("Hello", [], .suppressed)
         let expected = """
         <|im_start|>system
         \(prompt)<|im_end|>
